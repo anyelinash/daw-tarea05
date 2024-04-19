@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Comfortaa:wght@300;500&family=Lato:ital,wght@0,100;0,300;0,400;0,700;0,900;1,100;1,300;1,400;1,700;1,900&family=Neuton:ital,wght@0,200;0,300;0,400;0,700;0,800;1,400&family=Nunito:ital,wght@0,200..1000;1,200..1000&family=Oswald:wght@200..700&family=Poppins:ital,wght@0,100;0,200;0,300;0,400;0,500;0,600;0,700;0,800;0,900;1,100;1,200;1,300;1,400;1,500;1,600;1,700;1,800;1,900&display=swap" rel="stylesheet">
+    <title>Socket.IO Chat</title>
+    <style>
+        body {
+            font-family: "Poppins", sans-serif;
+            font-weight: 300;
+            margin: 0;
+            padding: 0;
+            background-color: #f2f2f2;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+        }
+        .container {
+            max-width: 600px;
+            width: 100%;
+            padding: 20px;
+            background-color: #fff;
+            border-radius: 10px;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+        }
+
+        .input-group {
+            margin-bottom: 10px;
+            display: flex;
+            align-items: center;
+        }
+
+        .input-group label {
+            margin-right: 10px;
+            font-weight: bold;
+        }
+
+        input[type="text"] {
+            width: calc(100% - 70px);
+            padding: 10px;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+            font-size: 16px;
+            transition: border-color 0.3s;
+        }
+
+        input[type="text"]:focus {
+            border-color: rgb(120, 112, 189);
+            outline: none;
+        }
+
+        button {
+            width: 100%;
+            padding: 10px;
+            background-color: rgb(49, 75, 102);
+            border: none;
+            border-radius: 5px;
+            color: #fff;
+            font-size: 16px;
+            cursor: pointer;
+            transition: background-color 0.3s;
+        }
+
+        button:hover {
+            background-color: #7596b9;
+        }
+
+        #messages {
+            list-style-type: none;
+            padding: 0;
+            overflow-y: auto;
+            height: 300px;
+        }
+
+        #messages li {
+            margin-bottom: 5px; 
+            word-wrap: break-word;
+            overflow: hidden; 
+        }
+
+        .sent {
+            text-align: right;
+        }
+
+        .received {
+            text-align: left;
+        }
+
+        .message-container {
+            display: inline-block; 
+            background-color: #DCF8C6; 
+            padding: 8px; 
+            border-radius: 10px; 
+            position: relative; 
+        }
+
+        .received .message-container {
+            background-color: #EFEFEF;
+        }
+
+        .timestamp {
+            font-size: 0.8em;
+            color: #888;
+        }
+        .image-container {
+            margin-bottom: 5px; 
+        }
+        .message-image {
+        border-radius: 50%; 
+        width: 40px; 
+        height: 40px; 
+        margin-right: 10px; 
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="input-group">
+            <label for="username">Username:</label>
+            <input type="text" id="username" placeholder="Username">
+        </div>
+        <div class="input-group">
+            <label for="profile-image">Imagen de perfil:</label>
+            <input type="file" id="imageInput" accept="image/*">
+        </div>
+        <div class="input-group">
+            <label for="message">Mensaje:</label>
+            <input type="text" id="message" placeholder="Message">
+        </div>
+        <button onclick="sendMessage()">Enviar</button>
+        <ul id="messages"></ul>
+        
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.3.1/socket.io.js"></script>
+    <script>
+        const socket = io();
+        let username = null;
+        let userConnected = false;
+
+        // Función para enviar mensajes
+        function sendMessage() {
+            if (!username) {
+                username = document.getElementById('username').value;
+                socket.emit('new_user', username);
+                userConnected = true;
+            }
+            const message = document.getElementById('message').value;
+            const imageFile = document.getElementById('imageInput').files[0];
+
+            // Verificar si se seleccionó un archivo
+            if (imageFile) {
+                const reader = new FileReader();
+                reader.onload = function(event) {
+                    // Enviar el mensaje y los datos del archivo al servidor
+                    const imageData = event.target.result; // Los datos de la imagen como una URL base64
+                    socket.emit('chat_message', { user: username, message, image: imageData });
+                };
+                reader.readAsDataURL(imageFile);
+            } else {
+                // Si no se seleccionó una imagen, enviar solo el mensaje de chat
+                socket.emit('chat_message', { user: username, message });
+            }
+            // Limpiar el campo de mensaje
+            document.getElementById('message').value = '';
+        }
+
+        // Escuchar mensajes de chat
+        socket.on('chat_message', (data) => {
+            const messages = document.getElementById('messages');
+            const li = document.createElement('li');
+            li.classList.add(data.user === username ? 'sent' : 'received');
+            const messageContainer = document.createElement('div');
+            messageContainer.classList.add('message-container');
+
+            // Crear contenedor para la imagen
+                const imageContainer = document.createElement('div');
+                imageContainer.classList.add('image-container');
+                li.appendChild(imageContainer);
+
+                // Agregar imagen si está presente en los datos recibidos
+                if (data.image) {
+                    const imageElement = document.createElement('img');
+                    imageElement.src = data.image;
+                    imageElement.classList.add('message-image'); // Aplicar la clase CSS
+                    imageContainer.appendChild(imageElement);
+                  }
+
+                // Agregar texto del mensaje
+                const messageText = document.createElement('div');
+                messageText.innerHTML = `<strong>${data.user}:</strong> ${data.message}`;
+                messageContainer.appendChild(messageText);
+
+                // Agregar el timestamp
+                const timestamp = document.createElement('span');
+                timestamp.classList.add('timestamp');
+                const now = new Date();
+                const timeString = now.getHours() + ':' + now.getMinutes();
+                timestamp.textContent = timeString;
+                messageContainer.appendChild(timestamp);
+
+                li.appendChild(messageContainer);
+                messages.appendChild(li);
+                messages.scrollTop = messages.scrollHeight;
+            });
+    </script>
+</body>
+</html>
